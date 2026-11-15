@@ -103,7 +103,7 @@ def compute_noise_metric(circ_gates, gate_params, inputs_bounds, weights_bounds,
 
 def compute_clifford_nr_for_circuit(circ_dir, noisy_dev, noiseless_dev, device_name, num_qubits, num_cdcs, num_shots, compute_actual_fidelity=False, num_trial_params=128,
                                     x_train=None, use_qiskit=False, basis_gates=None, coupling_map=None, use_qubit_mapping=True, index_mapping=None, use_real_backend=False,
-                                    noise_model_data=None, restrict_noise_to_mapping=True):
+                                    noise_model_data=None, restrict_noise_to_mapping=True, aer_method=None):
     """
     Compute Clifford Noise Robustness for a circuit using the noiseless and noisy devices passed in. num_cdc Clifford decoys will be used
     to compute the Clifford Noise Robustness.
@@ -132,6 +132,7 @@ def compute_clifford_nr_for_circuit(circ_dir, noisy_dev, noiseless_dev, device_n
             noise_model=restricted_noise_model,
             basis_gates=basis_gates,
             coupling_map=coupling_map,
+            **({'method': aer_method} if aer_method is not None else {})
         )
     
     noise_metric_dir = os.path.join(circ_dir, f'cnr_{num_cdcs}')        
@@ -199,7 +200,7 @@ def compute_clifford_nr_for_circuits(circ_dir, num_circs, device_name,
     noise_model=None, use_qiskit=False, basis_gates=None, coupling_map=None,
     use_qubit_mapping=False, save=False, index_mapping=None,
     circ_index_offset=0, dataset_file_extension='txt', use_real_backend=False,
-    fake_backend_json=None, restrict_noise_to_mapping=True):
+    fake_backend_json=None, restrict_noise_to_mapping=True, aer_method=None):
     """
     Compute the Clifford Noise Robustness for a group of circuits stored in the same directory.
     """
@@ -209,7 +210,9 @@ def compute_clifford_nr_for_circuits(circ_dir, num_circs, device_name,
         x_train = None
         
     if use_qiskit:
-        noiseless_dev = AerSimulator()
+        # [Aer method] Use an explicit simulation method only when requested;
+        # legacy workflows continue to use Aer's automatic selection.
+        noiseless_dev = AerSimulator(**({'method': aer_method} if aer_method is not None else {}))
         noise_model_data = None
         basis_gates = None
         coupling_map = None
@@ -231,6 +234,7 @@ def compute_clifford_nr_for_circuits(circ_dir, num_circs, device_name,
                 noise_model=noise_model_from_dict(noise_model_data),
                 basis_gates=basis_gates,
                 coupling_map=coupling_map,
+                **({'method': aer_method} if aer_method is not None else {})
             )
         else:
             noisy_dev = None
@@ -254,6 +258,7 @@ def compute_clifford_nr_for_circuits(circ_dir, num_circs, device_name,
                 use_qiskit, basis_gates, coupling_map, use_qubit_mapping, index_mapping,
                 use_real_backend, noise_model_data=noise_model_data,
                 restrict_noise_to_mapping=restrict_noise_to_mapping,
+                aer_method=aer_method,
             )
         )
         

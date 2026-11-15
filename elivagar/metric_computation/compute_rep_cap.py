@@ -3,7 +3,9 @@ import os
 import pennylane as qml
 import torch
 
-from qutip import Qobj
+# [RepCap optimization] qutip is no longer needed for reduced states; the
+# previous Qobj implementation is retained inline below for reference.
+# from qutip import Qobj
 
 from elivagar.circuits.arbitrary import get_circ_params
 from elivagar.circuits.create_circuit import create_gate_circ, TQCirc
@@ -14,12 +16,34 @@ from elivagar.utils.datasets import load_dataset
 def set_tq_circ_params(circ, params_list):
     with torch.no_grad():
         for i in range(len(circ.var_gates)):
-            circ.var_gates[i].params[0][0] = params_list[i]
+            target_param = circ.var_gates[i].params[0][0]
+            target_param.copy_(torch.as_tensor(
+                params_list[i], dtype=target_param.dtype, device=target_param.device
+            ))
     
     return
 
 
-def compute_reduced_similarity(circ, data, num_qubits, meas_qubits):
+def reduced_density_matrix(state, num_qubits, meas_qubits):
+    """Compute the reduced state without materializing a full density matrix."""
+    state = np.asarray(state).reshape(-1)
+    if num_qubits <= 0 or state.size != 2 ** num_qubits:
+        raise ValueError("state size must equal 2**num_qubits")
+    if not meas_qubits or len(set(meas_qubits)) != len(meas_qubits):
+        raise ValueError("meas_qubits must contain unique qubit indices")
+    if any(qubit < 0 or qubit >= num_qubits for qubit in meas_qubits):
+        raise ValueError("meas_qubits contains an out-of-range qubit index")
+
+    # TorchQuantum stores state axes in qubit order; bring measured axes first,
+    # then trace the unmeasured axes by contracting the reshaped state matrix.
+    remaining_qubits = [qubit for qubit in range(num_qubits) if qubit not in meas_qubits]
+    state_matrix = state.reshape((2,) * num_qubits).transpose(
+        tuple(meas_qubits) + tuple(remaining_qubits)
+    ).reshape(2 ** len(meas_qubits), -1)
+    return np.matmul(np.conj(state_matrix), state_matrix.T)
+
+
+def compute_reduced_similarity(circ, data, num_qubits, meas_qubits, device=None):
     """
     Compute the similarity between the reduced density matrices obtained from a circuit's outputs.
     """
@@ -28,17 +52,25 @@ def compute_reduced_similarity(circ, data, num_qubits, meas_qubits):
     circ_dms = []
     circ_fids = np.zeros((num_data, num_data))
     
-    circ(data)
-    out_states = circ.device.states.detach().numpy().reshape(num_data, -1)
+    # [RepCap GPU] Put batched inputs on the same device as the circuit.
+    device = torch.device(device or 'cpu')
+    data_tensor = torch.as_tensor(data, dtype=torch.float32, device=device)
+    circ(data_tensor)
+    out_states = circ.device.states.detach().cpu().numpy().reshape(num_data, -1)
     
     if len(meas_qubits) < num_qubits:
         for i in range(num_data):
-            density_matrix = np.matmul(np.conj(out_states[i:i + 1].T), out_states[i:i+1])
-            out_qobj = Qobj(density_matrix, dims=[[2] * num_qubits] * 2)
-            circ_dm = out_qobj.ptrace(meas_qubits).full()
+            # [RepCap optimization] Contract over unmeasured qubits directly;
+            # this is equivalent to the original full-density-matrix partial trace.
+            circ_dm = reduced_density_matrix(out_states[i], num_qubits, meas_qubits)
+
+            # [原始 qutip 实现，已停用] Preserve the reference implementation.
+            # density_matrix = np.matmul(np.conj(out_states[i:i + 1].T), out_states[i:i+1])
+            # out_qobj = Qobj(density_matrix, dims=[[2] * num_qubits] * 2)
+            # circ_dm = out_qobj.ptrace(meas_qubits).full()
 
             traces.append(np.trace(circ_dm))
-            circ_dms.append(circ_dm.data)
+            circ_dms.append(circ_dm)
 
         for s1 in range(num_data):
             for s2 in range(s1 + 1, num_data):
@@ -63,7 +95,8 @@ def compute_reduced_similarity(circ, data, num_qubits, meas_qubits):
     return circ_fids
 
 
-def compute_rep_cap(circ_dir, num_qubits, num_meas_qubits, data, ideal_matrix, num_param_samples, num_classes, save_circ_mat):
+def compute_rep_cap(circ_dir, num_qubits, num_meas_qubits, data, ideal_matrix, num_param_samples, num_classes, save_circ_mat,
+                    device=None):
     """
     Compute the representational capacity of a circuit w.r.t. some passed in data.
     """    
@@ -75,7 +108,9 @@ def compute_rep_cap(circ_dir, num_qubits, num_meas_qubits, data, ideal_matrix, n
 
     meas_qubits = [i for i in range(num_meas_qubits)]
 
-    circ = TQCirc(circ_gates, gate_params, inputs_bounds, weights_bounds, num_qubits)
+    # [RepCap GPU] Move both trainable gates and TorchQuantum state buffers to the requested device.
+    device = torch.device(device or 'cpu')
+    circ = TQCirc(circ_gates, gate_params, inputs_bounds, weights_bounds, num_qubits).to(device)
     
     num_data = data.shape[0]
     params = 2 * np.pi * np.random.sample((num_param_samples, weights_bounds[-1]))
@@ -92,7 +127,7 @@ def compute_rep_cap(circ_dir, num_qubits, num_meas_qubits, data, ideal_matrix, n
     for i in range(num_param_samples):
         set_tq_circ_params(circ, params[i])
 
-        curr_mat = compute_reduced_similarity(circ, data, num_qubits, meas_qubits)
+        curr_mat = compute_reduced_similarity(circ, data, num_qubits, meas_qubits, device)
         
         thres_mat = curr_mat > ((np.sum(curr_mat) - num_data) / (num_data * (num_data - 1)))
         circ_mean_thres_mat += thres_mat / num_param_samples
@@ -114,7 +149,7 @@ def compute_rep_cap(circ_dir, num_qubits, num_meas_qubits, data, ideal_matrix, n
 
 def compute_rep_cap_for_circuits(circs_dir, num_circs, circ_prefix, num_qubits, num_meas_qubits, dataset_name, num_classes,
                                  sel_samples_per_class, num_param_samples, encoding_type, 
-                                 num_data_reps, save_circ_mats=False, file_type='txt'):
+                                 num_data_reps, save_circ_mats=False, file_type='txt', device=None):
     """
     Compute representational capacity for a group of circuits in the same folder.
     Currently only handles balanced datasets - need to update to handle unbalanced datasets as well.
@@ -152,7 +187,7 @@ def compute_rep_cap_for_circuits(circs_dir, num_circs, circ_prefix, num_qubits, 
         curr_circ_dir = os.path.join(circs_dir, circ_prefix + f'_{i + 1}')
         circ_rep_cap = compute_rep_cap(
             curr_circ_dir, num_qubits, num_meas_qubits, sel_data,
-            ideal, num_param_samples, num_classes, save_circ_mats
+            ideal, num_param_samples, num_classes, save_circ_mats, device
         )
             
         circ_rep_caps.append(circ_rep_cap)

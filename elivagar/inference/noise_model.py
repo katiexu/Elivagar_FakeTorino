@@ -36,7 +36,8 @@ def get_params_from_tq_model(model_dir, num_params):
     model_params = np.zeros(num_params)
     
     for i in range(num_params):
-        model_params[i] = model_data[f'var_gates.{i}.params'].numpy().item()
+        # [Training GPU] GPU-trained checkpoints must be moved to CPU before NumPy conversion.
+        model_params[i] = model_data[f'var_gates.{i}.params'].detach().cpu().numpy().item()
     
     return model_params
 
@@ -231,7 +232,8 @@ def run_noisy_inference_for_tq_circuits_qiskit(circ_dir, circ_prefix, num_circs,
                                                coupling_map, dataset, embed_type, num_data_reps, num_test_samples=None, human_design=False, compute_noiseless=False,
                                                use_qubit_mapping=False, num_shots=1024, qubit_mapping_file_name=None, transpile_opt_level=0, file_suffix='',
                                                index_map=None, results_save_dir=None, pick_best=False, use_quantumnat=False, quantumnat_trained_dir=None,
-                                               noise_model_data=None, restrict_noise_to_mapping=True, file_type='txt', loss_type='mse'):
+                                               noise_model_data=None, restrict_noise_to_mapping=True, file_type='txt', loss_type='mse',
+                                               aer_method=None):
     """
     Run noisy inference for TQ circuits in the same folder - used to perform infrence for all ex. random, human designed, etc. circuits with one call.
 
@@ -247,6 +249,8 @@ def run_noisy_inference_for_tq_circuits_qiskit(circ_dir, circ_prefix, num_circs,
         
     # [FakeBackend] Only build the shared full-model simulator when per-circuit restriction is not used.
     use_restricted_noise = restrict_noise_to_mapping and noise_model_data is not None
+    # [Aer method] Leave Aer's default selection untouched unless the caller opts in.
+    aer_options = {'method': aer_method} if aer_method is not None else {}
 
     if use_restricted_noise:
         noisy_dev = None
@@ -254,7 +258,7 @@ def run_noisy_inference_for_tq_circuits_qiskit(circ_dir, circ_prefix, num_circs,
         if noise_model is None and noise_model_data is not None:
             noise_model = noise_model_from_dict(noise_model_data)
 
-        noisy_dev = AerSimulator(noise_model=noise_model)
+        noisy_dev = AerSimulator(noise_model=noise_model, **aer_options)
     
     all_accs = []
     
@@ -295,7 +299,7 @@ def run_noisy_inference_for_tq_circuits_qiskit(circ_dir, circ_prefix, num_circs,
             if not restricted_noise_model.to_dict().get('errors'):
                 print(f'Warning: no FakeBackend noise errors remain for mapping {mapped_qubits} in {curr_circ_dir}.')
 
-            circ_noisy_dev = AerSimulator(noise_model=restricted_noise_model)
+            circ_noisy_dev = AerSimulator(noise_model=restricted_noise_model, **aer_options)
         
         losses_list, accs_list = tq_model_inference_on_noisy_sim_qiskit(
             curr_circ_dir, device_name, num_runs, num_qubits, meas_qubits,

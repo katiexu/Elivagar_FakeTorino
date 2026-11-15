@@ -26,6 +26,11 @@ def load_dataset(name, embedding_type, num_reps, file_type='txt'):
         
         y_train = 1 - 2 * y_train[:, 0]
         y_test = 1 - 2 * y_test[:, 0]
+    # [LS/HM] Keep the generated feature vectors and ±1 labels unchanged.
+    elif name in ['LS-48', 'LS-64', 'HM-48', 'HM-64']:
+        num_features = 48 if name in ['LS-48', 'HM-48'] else 64
+        x_train = x_train[:, :num_features]
+        x_test = x_test[:, :num_features]
     elif name in ['mnist_2', 'fmnist_2', 'mnist_4', 'fmnist_4', 'mnist_4_0123']:
         x_train = x_train[:, :16]
         x_test = x_test[:, :16]

@@ -60,7 +60,9 @@ def train_tq_model(model, num_meas_qubits, opt, loss, data_loader, test_data_loa
                    use_test=True, return_train_losses=False, quantize=False,
                    noise_strength=0.1, device=torch.device('cpu'),
                    train_metrics_data_loader=None):
-    device = torch.device('cpu')
+    # [原始 CPU-only 训练路径，已停用] Respect the requested device instead.
+    # device = torch.device('cpu')
+    device = torch.device(device)
     
     if acc_fn == None:
         if isinstance(loss, TQCeLoss):
@@ -121,8 +123,8 @@ def train_tq_model(model, num_meas_qubits, opt, loss, data_loader, test_data_loa
             
             preds = model(x)
 
-            test_losses.append(loss(preds, y).detach().numpy())
-            test_accs.append(acc_fn(preds, y, num_meas_qubits).detach().numpy())
+            test_losses.append(loss(preds, y).detach().cpu().numpy())
+            test_accs.append(acc_fn(preds, y, num_meas_qubits).detach().cpu().numpy())
             
             num_test_samples += x.shape[0]
             
@@ -142,7 +144,10 @@ def train_tq_model(model, num_meas_qubits, opt, loss, data_loader, test_data_loa
         num_train_samples = 0
 
         # [TrainMetrics] Restore Torch RNG state so this extra pass cannot affect subsequent run initialization/training.
-        with torch.random.fork_rng(devices=[]):
+        rng_devices = []
+        if device.type == 'cuda':
+            rng_devices = [device.index if device.index is not None else torch.cuda.current_device()]
+        with torch.random.fork_rng(devices=rng_devices):
             quantizer.register_hook()
             try:
                 with torch.no_grad():

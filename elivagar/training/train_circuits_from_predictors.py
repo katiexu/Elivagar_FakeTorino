@@ -12,16 +12,20 @@ from elivagar.metric_computation.compute_composite_scores import compute_composi
 def train_elivagar_circuits(circ_dir, dataset, embed_type, num_data_reps, device_name, num_epochs, batch_size, num_qubits, num_meas_qubits,
                             num_data_for_rep_cap, num_params_for_rep_cap, num_cdcs, num_candidates_per_circuit=100,
                             num_circuits=2500, num_runs=5, noise_importance=0.5, results_dir=None, learning_rate=0.01,
-                            save_train_metrics=False, loss_type='mse', file_type='txt', num_train_samples=None):
+                            save_train_metrics=False, loss_type='mse', file_type='txt', num_train_samples=None,
+                            device=None):
     """
     Compute the composite scores for all the circuits in a directory and train the top-ranked circuits.
     """
+    # [Training GPU] Keep legacy callers on CPU, but allow an explicit accelerator.
+    device = torch.device(device or 'cpu')
+
     if loss_type == 'mse':
-        loss = TQMseLoss(num_meas_qubits, num_qubits)
+        loss = TQMseLoss(num_meas_qubits, num_qubits, device)
         use_softmax = False
     elif loss_type == 'nll':
         # [MNIST-10 NLL] Use the measured outputs as class logits and integer labels as targets.
-        loss = TQCeLoss(num_qubits, num_meas_qubits, torch.device('cpu'))
+        loss = TQCeLoss(num_qubits, num_meas_qubits, device)
         use_softmax = True
     else:
         raise ValueError(f"Unsupported training loss: {loss_type!r}")
@@ -98,7 +102,7 @@ def train_elivagar_circuits(circ_dir, dataset, embed_type, num_data_reps, device
         circ_losses, circ_accs = train_tq_circ_and_save_results(curr_circ_dir, train_data_loader, test_data_loader, num_runs, num_epochs,
                                         num_qubits, num_meas_qubits, loss, learning_rate=learning_rate,
                                         save_train_metrics=save_train_metrics,
-                                        use_softmax=use_softmax)
+                                        use_softmax=use_softmax, device=device)
         
         trial_losses.append(circ_losses)
         trial_accs.append(circ_accs)
