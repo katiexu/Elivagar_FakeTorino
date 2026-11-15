@@ -2,6 +2,7 @@ import argparse
 import os
 import numpy as np
 import pennylane as qml
+import torch
 
 from elivagar.metric_computation.compute_rep_cap import compute_rep_cap_for_circuits
 from elivagar.utils.dataset_circuit_hyperparams import dataset_circuit_hyperparams
@@ -20,6 +21,8 @@ def main():
     parser.add_argument('--dataset_file_extension', default='txt', type=str, help='extension for the dataset files')
     parser.add_argument('--num_param_samples', type=int, default=32,
                         help='number of parameter vectors to average over')
+    # [RepCap GPU] Allow accelerated statevector evaluation without changing the CPU default.
+    parser.add_argument('--use_gpu', action='store_true', help='use CUDA for TorchQuantum RepCap evaluation when available')
 
     parser.add_argument('--num_samples_per_class', type=int, default=16,
                         help='number of samples to use per class in the dataset')
@@ -41,14 +44,21 @@ def main():
         args.num_meas_qubits = curr_dataset_hyperparams['num_meas_qubits']   
 
     num_classes = curr_dataset_hyperparams['num_classes']
+
+    if args.use_gpu and torch.cuda.is_available():
+        device = torch.device('cuda')
+    else:
+        device = torch.device('cpu')
+        if args.use_gpu:
+            print('CUDA is unavailable; falling back to CPU for RepCap.')
     
     compute_rep_cap_for_circuits(args.circs_dir, args.num_circs, args.circ_prefix, args.num_qubits, 
                                  args.num_meas_qubits, args.dataset, num_classes,
-                                 args.num_samples_per_class,
-                                 args.num_param_samples, args.encoding_type, 
-                                 args.num_data_reps, args.save_matrices,
-                                 args.dataset_file_extension
-                                )
+                                  args.num_samples_per_class,
+                                  args.num_param_samples, args.encoding_type, 
+                                  args.num_data_reps, args.save_matrices,
+                                  args.dataset_file_extension, device
+                                 )
     
 if __name__ == '__main__':
     main()

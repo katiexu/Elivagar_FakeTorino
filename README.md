@@ -136,3 +136,20 @@ bash scripts/mnist_10/elivagar/eval_FakeTorino.sh
 ```
 
 The scripts use the existing `mnist_10_6_nll` NPY dataset and save outputs under `experiments/mnist_10_6_nll/72_params/ibm_FakeTorino/elivagar/`. Training uses NLL for 50 epochs and, by default, all 50,000 training examples; add `--num_train_samples 512` to the training command for a smaller pilot. Evaluation samples 400 test examples per trial. CNR and noisy inference use the FakeTorino snapshot through `AerSimulator`, not a live IBM backend. Runtime depends heavily on CPU performance and the generated circuits; measure the pilot before scheduling the full 2,500-circuit workflow.
+
+### Linearly separable and hidden-manifold workflows
+
+`LS-48`, `LS-64`, `HM-48`, and `HM-64` are four independent binary-classification tasks. Each has 320 training and 80 test examples; LS/HM 48-feature tasks use 12 logical qubits, and 64-feature tasks use 16. The registered circuit configurations use 60/80 trainable parameters respectively, one data repetition, one measured qubit, and 48/64 embedding gates.
+
+Each task has a separate, five-stage FakeTorino workflow. Run its scripts from the repository root in order:
+
+| Task | Circuit generation | CNR | RepCap | Train | Noisy evaluation |
+|---|---|---|---|---|---|
+| LS-48 | `bash scripts/LS-48/elivagar/circ_gen_FakeTorino.sh` | `bash scripts/LS-48/elivagar/cnr_FakeTorino.sh` | `bash scripts/LS-48/elivagar/repcap_FakeTorino.sh` | `bash scripts/LS-48/elivagar/train_FakeTorino.sh` | `bash scripts/LS-48/elivagar/eval_FakeTorino.sh` |
+| LS-64 | `bash scripts/LS-64/elivagar/circ_gen_FakeTorino.sh` | `bash scripts/LS-64/elivagar/cnr_FakeTorino.sh` | `bash scripts/LS-64/elivagar/repcap_FakeTorino.sh` | `bash scripts/LS-64/elivagar/train_FakeTorino.sh` | `bash scripts/LS-64/elivagar/eval_FakeTorino.sh` |
+| HM-48 | `bash scripts/HM-48/elivagar/circ_gen_FakeTorino.sh` | `bash scripts/HM-48/elivagar/cnr_FakeTorino.sh` | `bash scripts/HM-48/elivagar/repcap_FakeTorino.sh` | `bash scripts/HM-48/elivagar/train_FakeTorino.sh` | `bash scripts/HM-48/elivagar/eval_FakeTorino.sh` |
+| HM-64 | `bash scripts/HM-64/elivagar/circ_gen_FakeTorino.sh` | `bash scripts/HM-64/elivagar/cnr_FakeTorino.sh` | `bash scripts/HM-64/elivagar/repcap_FakeTorino.sh` | `bash scripts/HM-64/elivagar/train_FakeTorino.sh` | `bash scripts/HM-64/elivagar/eval_FakeTorino.sh` |
+
+All four tasks generate their own 2,500-circuit candidate pool and compute their own CNR results; no circuit pool is shared between LS and HM. CNR uses 16 Clifford replicas. RepCap uses 16 samples from each class and 32 parameter samples. Training uses batch size 32, saves final full-training-set metrics, and runs for 200 epochs on 12 qubits or 100 epochs on 16 qubits; `--use_gpu` enables CUDA for RepCap and training when available. The CNR and noisy-evaluation scripts select Aer `statevector` to avoid density-matrix memory growth at 12/16 qubits. Evaluation uses the full 80-sample test split.
+
+Based on small-circuit timing estimates, each 12-qubit workflow may take roughly 5–7 hours and each 16-qubit workflow roughly 40–50 hours; the four independent workflows together may take about 4–5 days. These are estimates, not measured full runs, and depend on circuit gate counts, CPU/GPU load, and simulator performance. Output directories are `experiments/<task>/<60|80>_params/ibm_FakeTorino/elivagar/`.

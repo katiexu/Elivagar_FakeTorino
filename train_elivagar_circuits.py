@@ -2,6 +2,7 @@ import argparse
 import os
 import numpy as np
 import pennylane as qml
+import torch
 
 from elivagar.training.train_circuits_from_predictors import train_elivagar_circuits
 from elivagar.utils.dataset_circuit_hyperparams import dataset_circuit_hyperparams
@@ -16,7 +17,8 @@ def main():
     parser.add_argument('--num_epochs', default=50, type=int, help='number of epochs to train the generated circuits for')
     parser.add_argument('--batch_size', default=32, type=int, help='batch size for training')
     parser.add_argument('--device_name', default=None, help='the device noise model the CNR scores were computed using')
-    parser.add_argument('--num_runs_per_circ', default=5, help='number of training runs for each circuit')
+    # Parse explicit run counts as integers, just like the default of five runs.
+    parser.add_argument('--num_runs_per_circ', default=5, type=int, help='number of training runs for each circuit')
     parser.add_argument('--encoding_type', default='angle', help='the encoding type to use for the data')
     parser.add_argument('--num_data_reps', default=None, help='the number of times to re-encode the data')
     parser.add_argument('--noise_importance', type=float, default=0.5, help='the relative importance of circuit CNR scores')
@@ -37,6 +39,8 @@ def main():
                         help='file extension used by the selected dataset')
     parser.add_argument('--num_train_samples', type=int, default=None,
                         help='optional random training subset size; default uses all training samples')
+    # [Training GPU] Keep CPU as the default and fall back safely if CUDA is unavailable.
+    parser.add_argument('--use_gpu', action='store_true', help='use CUDA for TorchQuantum training when available')
 
     args = parser.parse_args()
     
@@ -53,6 +57,13 @@ def main():
         raise ValueError('Please enter the number of clifford replicas used to compute CNR scores.')
         
     curr_dataset_hyperparams = dataset_circuit_hyperparams[args.dataset]
+
+    if args.use_gpu and torch.cuda.is_available():
+        device = torch.device('cuda')
+    else:
+        device = torch.device('cpu')
+        if args.use_gpu:
+            print('CUDA is unavailable; falling back to CPU for training.')
         
     if args.num_qubits is None:
         args.num_qubits = curr_dataset_hyperparams['num_qubits']
@@ -73,7 +84,8 @@ def main():
                             save_train_metrics=args.save_train_metrics,
                             loss_type=args.loss,
                             file_type=args.dataset_file_extension,
-                            num_train_samples=args.num_train_samples)
+                            num_train_samples=args.num_train_samples,
+                            device=device)
     
 if __name__ == '__main__':
     main()

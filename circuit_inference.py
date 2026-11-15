@@ -53,6 +53,9 @@ def main():
                         help='path to the FakeBackend properties JSON (defaults to the file resolved from --device_name)')
     parser.add_argument('--full_noise_model', action='store_true',
                         help='use the full device noise model instead of restricting it to each circuit\'s qubit mapping')
+    # [Aer method] Explicitly select a simulator method for high-qubit-count noisy inference when needed.
+    parser.add_argument('--aer_method', default=None, type=str,
+                        help='optional AerSimulator method (for example: statevector); default uses Aer automatic selection')
     
     args = parser.parse_args()
     
@@ -107,7 +110,8 @@ def main():
         noise_model_data=noise_model_data,
         restrict_noise_to_mapping=not args.full_noise_model,
         file_type=args.dataset_file_extension,
-        loss_type=args.loss
+        loss_type=args.loss,
+        aer_method=args.aer_method
     )    
     
     print('Time taken for', args.dataset, time.time() - start)

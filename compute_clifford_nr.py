@@ -30,6 +30,9 @@ def main():
     parser.add_argument('--full_noise_model', action='store_true', help='use the full FakeBackend noise model instead of restricting it to each circuit mapping')
     parser.add_argument('--dataset_file_extension', default='txt', type=str, help='extension for the dataset files')
     parser.add_argument('--symmetric', action='store_true', help='whether the device edges are symmetric or not.')
+    # [Aer method] Large logical circuits can explicitly use statevector simulation; None preserves Aer automatic selection.
+    parser.add_argument('--aer_method', default=None, type=str,
+                        help='optional AerSimulator method (for example: statevector); default uses Aer automatic selection')
     
     args = parser.parse_args()
     
@@ -63,6 +66,7 @@ def main():
         index_mapping, args.circ_index_offset, args.dataset_file_extension,
         fake_backend_json=args.fake_backend_json,
         restrict_noise_to_mapping=not args.full_noise_model,
+        aer_method=args.aer_method,
     )
     
 if __name__ == '__main__':
