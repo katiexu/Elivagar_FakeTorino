@@ -7,7 +7,7 @@
 To setup the environment required to run Élivágar, first clone this repository:
 
 ```
-git clone https://github.com/SashwatAnagolum/Elivagar.git
+git clone https://github.com/katiexu/Elivagar_FakeTorino.git
 ```
 
 Then, create a new virtual environment, and activate it:
