@@ -139,7 +139,7 @@ The scripts use the existing `mnist_10_6_nll` NPY dataset and save outputs under
 
 ### Linearly separable and hidden-manifold workflows
 
-`LS-48`, `LS-64`, `HM-48`, and `HM-64` are four independent binary-classification tasks. Each has 320 training and 80 test examples; LS/HM 48-feature tasks use 12 logical qubits, and 64-feature tasks use 16. The registered circuit configurations use 60/80 trainable parameters respectively, one data repetition, one measured qubit, and 48/64 embedding gates.
+`LS-48`, `LS-64`, `HM-48`, and `HM-64` are four independent binary-classification tasks. Each has 320 training and 80 test examples; LS/HM 48-feature tasks use 12 logical qubits, and 64-feature tasks use 16. The registered circuit configurations use 60/160 trainable parameters respectively (the 16-qubit tasks were raised from 80 to 160), one data repetition, one measured qubit, and 48/64 embedding gates.
 
 Each task has a separate, five-stage FakeTorino workflow. Run its scripts from the repository root in order:
 
@@ -152,4 +152,4 @@ Each task has a separate, five-stage FakeTorino workflow. Run its scripts from t
 
 All four tasks generate their own 2,500-circuit candidate pool and compute their own CNR results; no circuit pool is shared between LS and HM. CNR uses 16 Clifford replicas. RepCap uses 16 samples from each class and 32 parameter samples. Training uses batch size 32, saves final full-training-set metrics, and runs for 200 epochs on 12 qubits or 100 epochs on 16 qubits; `--use_gpu` enables CUDA for RepCap and training when available. The CNR and noisy-evaluation scripts select Aer `statevector` to avoid density-matrix memory growth at 12/16 qubits. Evaluation uses the full 80-sample test split.
 
-Based on small-circuit timing estimates, each 12-qubit workflow may take roughly 5–7 hours and each 16-qubit workflow roughly 40–50 hours; the four independent workflows together may take about 4–5 days. These are estimates, not measured full runs, and depend on circuit gate counts, CPU/GPU load, and simulator performance. Output directories are `experiments/<task>/<60|80>_params/ibm_FakeTorino/elivagar/`.
+Based on small-circuit timing estimates, each 12-qubit workflow may take roughly 5–7 hours and each 16-qubit workflow roughly 40–50 hours with 80 trainable parameters; with 160 trainable parameters the 16-qubit circuits are about 1.6× deeper, so CNR, training, and noisy evaluation for LS-64/HM-64 take correspondingly longer. These are estimates, not measured full runs, and depend on circuit gate counts, CPU/GPU load, and simulator performance. Output directories are `experiments/<task>/<60|160>_params/ibm_FakeTorino/elivagar/`.

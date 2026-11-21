@@ -20,7 +20,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent
 DEFAULT_SEARCH_DIR = Path(
     # "experiments/mnist_4_0123/40_params/ibm_FakeTorino/elivagar/"
-    "experiments/HM-48/60_params/ibm_FakeTorino/elivagar/"
+    "experiments/HM-64/160_params/ibm_FakeTorino/elivagar/"
     "search_100_ibm_FakeTorino"
 )
 
