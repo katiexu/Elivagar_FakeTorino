@@ -85,7 +85,7 @@ python extract_fake_torino.py --output fake_torino_properties.json
 
 The resulting `fake_torino_properties.json` is a static calibration snapshot, not live device data. In the `elivagar` environment, `--device_name ibm_FakeTorino` resolves to this file automatically; use `--fake_backend_json <path>` if the snapshot is stored elsewhere.
 
-CNR now restricts the FakeBackend noise model to the physical qubits in each circuit's mapping by default, retaining the mapped qubits' gate and readout errors. Based on the measured runtime, 2,500 circuits with 32 Clifford replicas are estimated to take about **1 hour**, rather than about **20 hours** with the full 133-qubit noise model. Add `--full_noise_model` to the `compute_clifford_nr.py` command to use the full model for comparison; the `cnr.txt` and score output formats and locations remain unchanged.
+CNR now restricts the FakeBackend noise model to the physical qubits in each circuit's mapping by default, retaining the mapped qubits' gate and readout errors. The full MNIST-2 run (2,500 circuits, 32 Clifford replicas) took about **1 hour**, compared with an estimated **20 hours** with the full 133-qubit noise model. Add `--full_noise_model` to the `compute_clifford_nr.py` command to use the full model for comparison; the `cnr.txt` and score output formats and locations remain unchanged.
 
 ### MNIST-2 Élivágar workflow
 
@@ -99,7 +99,7 @@ bash scripts/mnist_2/elivagar/train_FakeTorino.sh
 bash scripts/mnist_2/elivagar/eval_FakeTorino.sh
 ```
 
-Circuit generation uses the snapshot's hardware properties. CNR and noisy inference build an `AerSimulator` from its noise model; neither runs a `FakeTorino` backend object or connects to IBM hardware. RepCap and model training are classical/device-independent stages, although training uses the CNR and RepCap scores. Install the additional RepCap dependency in `elivagar` with `python -m pip install "qutip<5"` if it is not already available.
+Circuit generation uses the snapshot's hardware properties. CNR and noisy inference build an `AerSimulator` from its noise model; neither runs a `FakeTorino` backend object or connects to IBM hardware. RepCap and model training are classical/device-independent stages, although training uses the CNR and RepCap scores. RepCap computes reduced density matrices directly from statevectors, so `qutip` is no longer required.
 
 ### MNIST-4 digits 0–3 Élivágar workflow
 
@@ -121,7 +121,7 @@ bash scripts/mnist_4/elivagar/train_FakeTorino.sh
 bash scripts/mnist_4/elivagar/eval_FakeTorino.sh
 ```
 
-These scripts save their circuits and results under `experiments/mnist_4_0123/40_params/ibm_FakeTorino/elivagar/`. RepCap samples 16 examples per class (64 total) for each circuit; training uses the full training split. The evaluation script follows the original MNIST-4 setting and samples 2,000 test examples rather than all 5,782. Remove `--num_test_samples 2000` from that script to evaluate the full test split. Training uses the larger dataset and can take substantially longer than MNIST-2; the Osaka-named scripts are retained unchanged for the original workflow.
+These scripts save their circuits and results under `experiments/mnist_4_0123/40_params/ibm_FakeTorino/elivagar/`. RepCap samples 16 examples per class (64 total) for each circuit; training uses the full training split. The evaluation script follows the original MNIST-4 setting and samples 2,000 test examples rather than all 5,782. Remove `--num_test_samples 2000` from that script to evaluate the full test split. In the full run, training took about 9 h 12 min (measured from its log). Estimates from output-file timestamps are about 2 h 22 min for CNR, 43 min for RepCap, and 4 h for evaluation. The Osaka-named scripts are retained unchanged for the original workflow.
 
 ### MNIST-10 NLL FakeTorino workflow
 
@@ -139,7 +139,7 @@ The scripts use the existing `mnist_10_6_nll` NPY dataset and save outputs under
 
 ### Linearly separable and hidden-manifold workflows
 
-`LS-48`, `LS-64`, `HM-48`, and `HM-64` are four independent binary-classification tasks. Each has 320 training and 80 test examples; LS/HM 48-feature tasks use 12 logical qubits, and 64-feature tasks use 16. The registered circuit configurations use 60/160 trainable parameters respectively (the 16-qubit tasks were raised from 80 to 160), one data repetition, one measured qubit, and 48/64 embedding gates.
+`LS-48`, `LS-64`, `HM-48`, and `HM-64` are four independent binary-classification tasks. Generate their data with `python experiment_data/generate_linearly_separable.py` and `python experiment_data/generate_hidden_manifold.py`. The scripts keep the original random streams and write only the 48- and 64-feature datasets to `experiment_data/{LS,HM}-{48,64}/`. Each task has 320 training and 80 test examples, and the original validation split is merged into training. The 48-feature tasks use 12 logical qubits, and the 64-feature tasks use 16. The registered circuit configurations use 60/160 trainable parameters respectively (the 16-qubit tasks were raised from 80 to 160), one data repetition, one measured qubit, and 48/64 embedding gates.
 
 Each task has a separate, five-stage FakeTorino workflow. Run its scripts from the repository root in order:
 
@@ -152,4 +152,14 @@ Each task has a separate, five-stage FakeTorino workflow. Run its scripts from t
 
 All four tasks generate their own 2,500-circuit candidate pool and compute their own CNR results; no circuit pool is shared between LS and HM. CNR uses 16 Clifford replicas. RepCap uses 16 samples from each class and 32 parameter samples. Training uses batch size 32, saves final full-training-set metrics, and runs for 200 epochs on 12 qubits or 100 epochs on 16 qubits; `--use_gpu` enables CUDA for RepCap and training when available. The CNR and noisy-evaluation scripts select Aer `statevector` to avoid density-matrix memory growth at 12/16 qubits. Evaluation uses the full 80-sample test split.
 
-Based on small-circuit timing estimates, each 12-qubit workflow may take roughly 5–7 hours and each 16-qubit workflow roughly 40–50 hours with 80 trainable parameters; with 160 trainable parameters the 16-qubit circuits are about 1.6× deeper, so CNR, training, and noisy evaluation for LS-64/HM-64 take correspondingly longer. These are estimates, not measured full runs, and depend on circuit gate counts, CPU/GPU load, and simulator performance. Output directories are `experiments/<task>/<60|160>_params/ibm_FakeTorino/elivagar/`.
+Measured full runs on a 32-core CPU with an RTX 4080 took about 9.7–9.9 hours for each 12-qubit task. Each 16-qubit task with 160 parameters took about 61 hours, and CNR accounted for about 47 hours of that time. RepCap and training ran on the GPU; CNR and noisy evaluation used Aer `statevector`. Output directories are `experiments/<task>/<60|160>_params/ibm_FakeTorino/elivagar/`.
+
+### Trial outputs and result export
+
+Training writes the selected circuits to `search_100_ibm_FakeTorino/trial_N/`. Each trial contains the circuit files (`gates.txt`, `gate_params.txt`, bounds files, and `qubit_mapping.txt`) and one `run_K/model.pt` per training run. The trial also stores noiseless test metrics in `accs.txt` and `val_losses.txt`, plus noisy test metrics in `noise_sim/ibm_FakeTorino/*_inference_only.txt`, with one line per run. With `--save_train_metrics`, `train_accs.txt` and `train_losses.txt` store each final model's metrics on the full training set; these values are not the per-batch values shown in the training log.
+
+To collect all trials and runs into `results/results_<task>.csv`, run:
+
+```bash
+python export_trial_results.py --search_dir experiments/<task>/<N>_params/ibm_FakeTorino/elivagar/search_100_ibm_FakeTorino
+```
