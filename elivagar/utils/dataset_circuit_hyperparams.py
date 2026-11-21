@@ -14,14 +14,18 @@ dataset_names = [
     'LS-48', 'LS-64', 'HM-48', 'HM-64'
 ]
 
-circuit_params = [16, 20, 20, 24, 32, 32, 40, 40, 120, 60, 72, 20, 32, 40, 24, 72, 40, 60, 80, 60, 80]
+# [LS/HM] LS-64 / HM-64 (16 qubits) use 160 trainable parameters (previously 80, kept below for reference).
+# circuit_params = [16, 20, 20, 24, 32, 32, 40, 40, 120, 60, 72, 20, 32, 40, 24, 72, 40, 60, 80, 60, 80]
+circuit_params = [16, 20, 20, 24, 32, 32, 40, 40, 120, 60, 72, 20, 32, 40, 24, 72, 40, 60, 160, 60, 160]
 circuit_embeds = [4, 8, 16, 16, 16, 10, 10, 16, 64, 36, 36, 16, 16, 16, 16, 36, 16, 48, 64, 48, 64]
 circuit_qubits = [2, 4, 4, 4, 4, 4, 4, 4, 8, 6, 10, 4, 4, 4, 4, 6, 4, 12, 16, 12, 16]
 num_data_reps = [2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 num_meas_qubits = [1, 1, 1, 2, 1, 1, 2, 2, 4, 4, 10, 1, 1, 2, 2, 4, 2, 1, 1, 1, 1]
 num_embed_layers_angle_iqp = [2, 2, 4, 4, 4, 3, 3, 4, 8, 6, 4, 4, 4, 4, 4, 6, 4, 4, 4, 4, 4]
 num_embed_layers_amp = [1 for i in range(len(dataset_names))]
-num_var_layers = [8, 5, 5, 6, 8, 8, 10, 10, 15, 10, 8, 5, 8, 10, 6, 12, 10, 5, 5, 5, 5]
+# [LS/HM] Baseline-only layer count for LS-64 / HM-64 follows num_params / num_qubits = 160 / 16 = 10.
+# num_var_layers = [8, 5, 5, 6, 8, 8, 10, 10, 15, 10, 8, 5, 8, 10, 6, 12, 10, 5, 5, 5, 5]
+num_var_layers = [8, 5, 5, 6, 8, 8, 10, 10, 15, 10, 8, 5, 8, 10, 6, 12, 10, 5, 10, 5, 10]
 num_classes = [2, 2, 2, 4, 2, 2, 4, 4, 10, 10, 10, 2, 2, 4, 4, 10, 4, 2, 2, 2, 2]
 
 for i in range(len(dataset_names)):
